@@ -13,16 +13,29 @@ async function requestGeneration(stage, image) {
   return result.imageUrl;
 }
 
+async function requestVideo(image) {
+  const data = new FormData();
+  data.set("image", image, "scene.png");
+  const response = await fetch("/api/generate-video", { method: "POST", body: data });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || "Video generation failed.");
+  return result;
+}
+
 export default function Home() {
   const [sourceFile, setSourceFile] = useState(null);
   const [sourcePreview, setSourcePreview] = useState(null);
   const [uploadStep, setUploadStep] = useState({ cls: "active", status: "Ready" });
   const [mascotStep, setMascotStep] = useState({ cls: "locked", status: "Waiting" });
   const [sceneStep, setSceneStep] = useState({ cls: "locked", status: "Waiting" });
+  const [videoStep, setVideoStep] = useState({ cls: "locked", status: "Waiting" });
   const [mascotUrl, setMascotUrl] = useState(null);
   const [sceneUrl, setSceneUrl] = useState(null);
+  const [videoDownloadUrl, setVideoDownloadUrl] = useState(null);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState(null);
   const [mascotBusy, setMascotBusy] = useState(false);
   const [sceneBusy, setSceneBusy] = useState(false);
+  const [videoBusy, setVideoBusy] = useState(false);
   const [error, setError] = useState("");
 
   function handleFileChange(event) {
@@ -60,11 +73,31 @@ export default function Home() {
       setSceneUrl(url);
       setMascotStep({ cls: "complete", status: "Complete" });
       setSceneStep({ cls: "complete", status: "Complete" });
+      setVideoStep({ cls: "active", status: "Ready" });
     } catch (err) {
       setMascotStep({ cls: "active", status: "Try again" });
       setError(err.message);
     } finally {
       setSceneBusy(false);
+    }
+  }
+
+  async function handleCreateVideo() {
+    setError("");
+    setVideoBusy(true);
+    setVideoStep((step) => ({ ...step, status: "Generating" }));
+    try {
+      const blob = await fetch(sceneUrl).then((response) => response.blob());
+      const file = new File([blob], "scene.png", { type: "image/png" });
+      const { videoUrl, previewUrl } = await requestVideo(file);
+      setVideoDownloadUrl(videoUrl);
+      setVideoPreviewUrl(previewUrl);
+      setVideoStep({ cls: "complete", status: "Complete" });
+    } catch (err) {
+      setVideoStep({ cls: "active", status: "Try again" });
+      setError(err.message);
+    } finally {
+      setVideoBusy(false);
     }
   }
 
@@ -182,6 +215,44 @@ export default function Home() {
             {sceneUrl && (
               <a className="button secondary" href={sceneUrl} download="morphling-sitting-mascot.png">
                 Download final PNG <span>↓</span>
+              </a>
+            )}
+          </div>
+        </article>
+
+        <article className={`step ${videoStep.cls}`} data-step="video">
+          <div className="rail">
+            <span>04</span>
+          </div>
+          <div className="content">
+            <div className="step-title">
+              <div>
+                <small>MOTION</small>
+                <h2>Animate the mascot</h2>
+              </div>
+              <b className="status">{videoStep.status}</b>
+            </div>
+            <div className={`result${videoPreviewUrl ? "" : " empty"}`}>
+              {videoPreviewUrl ? (
+                <video src={videoPreviewUrl} autoPlay loop muted playsInline />
+              ) : (
+                <span>Your animated mascot preview will appear here.</span>
+              )}
+            </div>
+            <button id="createVideo" disabled={!sceneUrl || videoBusy} onClick={handleCreateVideo}>
+              {videoBusy ? (
+                <>
+                  <span className="spinner" /> Animating…
+                </>
+              ) : (
+                <>
+                  Create video <span>→</span>
+                </>
+              )}
+            </button>
+            {videoDownloadUrl && (
+              <a className="button secondary" href={videoDownloadUrl} download>
+                Download transparent ProRes (.mov) <span>↓</span>
               </a>
             )}
           </div>
