@@ -7,6 +7,7 @@ import { generateImageEdit, validateImageUpload } from "../lib/openai-images.js"
 test("generation prompts are bundled as runtime strings", () => {
   assert.match(generationPrompts.mascot, /premium, collectible-quality character illustration/);
   assert.match(generationPrompts.sitting, /sitting on an office chair/);
+  assert.match(generationPrompts.video, /Animate the provided mascot/);
 });
 
 test("validateImageUpload accepts supported image uploads", () => {
