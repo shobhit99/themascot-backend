@@ -1,0 +1,12 @@
+Transform the person in the provided photo into a premium, collectible-quality character illustration in a modern sports-sticker / trading-card comic style, while preserving a strong, immediate likeness. Keep the subject's real facial structure, hairstyle, expression, skin tone, build, pose, and clothing recognizably faithful to the photo — anyone who knows this person should identify the illustration instantly. Do not infantilize, chibi-fy, or toy-ify the subject: keep natural adult proportions (roughly six to seven heads tall), a defined neck and jaw, anatomically believable limbs, and real hands with individual fingers. Keep the eyes, nose, and mouth at natural scale — do not enlarge the eyes or shrink the facial features.
+
+Render with confident, clean ink outlines of varying line weight, crisp cel shading using two to three tones per surface, and selective soft airbrushed gradients on skin and hair for dimension. Include rich, tasteful detail: structured hair shapes with highlights, defined facial features, fabric folds and seams in the clothing, muscle and anatomy definition where visible, and subtle material texture where it adds realism. Colors should be vibrant, saturated, and high contrast, with polished professional finishing. The quality bar is a high-end editorial sports illustration or premium character art — not a children's mascot, app icon, or flat corporate vector graphic.
+
+Faithfully preserve any numbers, crests, emblems, or markings that are genuinely part of the subject's clothing in the photo. Do not invent or add any new text, logos, watermarks, borders, frames, or decorative elements.
+
+Technical requirements — follow these exactly:
+- The background must be one perfectly uniform, solid, saturated green (#009611) filling the entire canvas, with no gradients, vignettes, textures, patterns, reflections, floor, horizon line, or background objects of any kind.
+- Do not paint any ground shadow, contact shadow, or drop shadow under or behind the subject; the figure sits on the flat color with no shadow at all.
+- No part of the subject may use the same green as the background, especially along the silhouette edge.
+- The subject's edges must be crisp, clean, and high contrast against the green background to enable effortless automated background removal.
+- Composition: subject centered, facing forward, full body visible with no part cropped, occupying approximately 70–80% of the canvas height, with a clear margin of solid background on all sides.
