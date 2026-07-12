@@ -11,6 +11,7 @@
 import type * as auth from "../auth.js";
 import type * as authEmail from "../authEmail.js";
 import type * as http from "../http.js";
+import type * as media from "../media.js";
 import type * as otp from "../otp.js";
 
 import type {
@@ -23,6 +24,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   authEmail: typeof authEmail;
   http: typeof http;
+  media: typeof media;
   otp: typeof otp;
 }>;
 

@@ -1,7 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import SignOutButton from "./SignOutButton";
+
+async function requestLibrary() {
+  const response = await fetch("/api/media", { cache: "no-store" });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || "Unable to load generated media.");
+  return result.media;
+}
 
 async function requestGeneration(stage, image) {
   const data = new FormData();
@@ -36,7 +43,30 @@ export default function Home() {
   const [mascotBusy, setMascotBusy] = useState(false);
   const [sceneBusy, setSceneBusy] = useState(false);
   const [videoBusy, setVideoBusy] = useState(false);
+  const [mediaLibrary, setMediaLibrary] = useState([]);
+  const [libraryLoading, setLibraryLoading] = useState(true);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    requestLibrary()
+      .then((media) => {
+        if (active) setMediaLibrary(media);
+      })
+      .catch((err) => {
+        if (active) setError(err.message);
+      })
+      .finally(() => {
+        if (active) setLibraryLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function refreshLibrary() {
+    setMediaLibrary(await requestLibrary());
+  }
 
   function handleFileChange(event) {
     const file = event.target.files[0];
@@ -52,6 +82,7 @@ export default function Home() {
     try {
       const url = await requestGeneration("mascot", sourceFile);
       setMascotUrl(url);
+      void refreshLibrary().catch(() => {});
       setUploadStep({ cls: "complete", status: "Complete" });
       setMascotStep({ cls: "active", status: "Ready" });
     } catch (err) {
@@ -71,6 +102,7 @@ export default function Home() {
       const file = new File([blob], "base-mascot.png", { type: "image/png" });
       const url = await requestGeneration("sitting", file);
       setSceneUrl(url);
+      void refreshLibrary().catch(() => {});
       setMascotStep({ cls: "complete", status: "Complete" });
       setSceneStep({ cls: "complete", status: "Complete" });
       setVideoStep({ cls: "active", status: "Ready" });
@@ -92,6 +124,7 @@ export default function Home() {
       const { videoUrl, previewUrl } = await requestVideo(file);
       setVideoDownloadUrl(videoUrl);
       setVideoPreviewUrl(previewUrl);
+      void refreshLibrary().catch(() => {});
       setVideoStep({ cls: "complete", status: "Complete" });
     } catch (err) {
       setVideoStep({ cls: "active", status: "Try again" });
@@ -258,6 +291,44 @@ export default function Home() {
           </div>
         </article>
       </section>
+
+      <section className="media-library" aria-labelledby="media-library-title">
+        <div className="library-heading">
+          <div>
+            <p className="eyebrow">YOUR LIBRARY</p>
+            <h2 id="media-library-title">Generated media</h2>
+          </div>
+          <span>{mediaLibrary.length} saved</span>
+        </div>
+
+        {libraryLoading ? (
+          <p className="library-empty">Loading your generated media…</p>
+        ) : mediaLibrary.length === 0 ? (
+          <p className="library-empty">Your generated mascots, scenes, and videos will appear here.</p>
+        ) : (
+          <div className="media-grid">
+            {mediaLibrary.map((item) => (
+              <article className="media-card" key={item.id}>
+                <div className="media-preview">
+                  {item.kind === "video" ? (
+                    <video src={item.url} controls muted playsInline preload="metadata" />
+                  ) : (
+                    <img src={item.url} alt={`Generated ${item.kind}`} loading="lazy" />
+                  )}
+                </div>
+                <div className="media-meta">
+                  <div>
+                    <strong>{item.kind === "mascot" ? "Base mascot" : item.kind === "scene" ? "Scene" : "Video"}</strong>
+                    <small>{new Date(item.createdAt).toLocaleString()}</small>
+                  </div>
+                  <a href={item.downloadUrl} className="library-download">Download</a>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
       <p className="error" role="alert">
         {error}
       </p>
