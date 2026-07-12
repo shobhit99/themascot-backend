@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { generationPrompts } from "../lib/generation-prompts.js";
 import { generateImageEdit, validateImageUpload } from "../lib/openai-images.js";
+
+test("generation prompts are bundled as runtime strings", () => {
+  assert.match(generationPrompts.mascot, /premium, collectible-quality character illustration/);
+  assert.match(generationPrompts.sitting, /sitting on an office chair/);
+});
 
 test("validateImageUpload accepts supported image uploads", () => {
   assert.doesNotThrow(() => validateImageUpload({ type: "image/png", size: 1024 }));
