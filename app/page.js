@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import SignOutButton from "./SignOutButton";
 
 async function requestGeneration(stage, image) {
   const data = new FormData();
@@ -73,6 +74,7 @@ export default function Home() {
         <span className="mark">M</span>
         <strong>Morphling Studio</strong>
         <span className="pill">Image pipeline</span>
+        <SignOutButton />
       </nav>
       <header>
         <p className="eyebrow">FROM PORTRAIT TO CHARACTER</p>
