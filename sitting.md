@@ -99,7 +99,7 @@ Background
 Use a perfectly solid chroma green background.
 
 Background color:
-#00FF00
+#009611
 
 No gradients.
 
