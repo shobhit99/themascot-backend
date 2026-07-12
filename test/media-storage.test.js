@@ -9,7 +9,10 @@ function fakeBucket({ failPut = false } = {}) {
     objects,
     async put(key, value, options) {
       if (failPut) throw new Error("R2 unavailable");
-      objects.set(key, { value: Buffer.from(value), options });
+      const storedValue = value instanceof ReadableStream
+        ? Buffer.from(await new Response(value).arrayBuffer())
+        : Buffer.from(value);
+      objects.set(key, { value: storedValue, options });
     },
     async delete(keys) {
       for (const key of Array.isArray(keys) ? keys : [keys]) objects.delete(key);
@@ -93,6 +96,35 @@ test("storeGeneratedMedia stores a private preview at the reserved destination",
   );
 });
 
+test("storeGeneratedMedia accepts an explicit size for streaming container output", async () => {
+  const bucket = fakeBucket();
+  let reserved;
+
+  await storeGeneratedMedia({
+    bucket,
+    bytes: new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode("mov"));
+        controller.close();
+      },
+    }),
+    size: 123_456,
+    contentType: "video/quicktime",
+    kind: "video",
+    reserveMedia: async (metadata) => {
+      reserved = metadata;
+      return {
+        mediaId: "media-stream",
+        objectKey: "users/user-1/media/media-stream/asset.mov",
+      };
+    },
+    finalizeMedia: async () => {},
+    abortMedia: async () => {},
+  });
+
+  assert.equal(reserved.size, 123_456);
+});
+
 test("storeGeneratedMedia cleans uploaded objects and aborts a reservation when R2 fails", async () => {
   const bucket = fakeBucket({ failPut: true });
   let aborted;
@@ -145,4 +177,32 @@ test("storeGeneratedMedia preserves uploaded objects when finalization is ambigu
 
   assert.equal(aborted, false);
   assert.equal(bucket.objects.size, 1);
+});
+
+test("storeGeneratedMedia cancels streaming bytes when reservation fails", async () => {
+  let cancelledWith;
+  const bytes = new ReadableStream({
+    cancel(reason) {
+      cancelledWith = reason;
+    },
+  });
+  const reservationError = new Error("Convex unavailable");
+
+  await assert.rejects(
+    storeGeneratedMedia({
+      bucket: fakeBucket(),
+      bytes,
+      size: 100,
+      contentType: "video/quicktime",
+      kind: "video",
+      reserveMedia: async () => {
+        throw reservationError;
+      },
+      finalizeMedia: async () => {},
+      abortMedia: async () => {},
+    }),
+    /Convex unavailable/,
+  );
+
+  assert.equal(cancelledWith, reservationError);
 });

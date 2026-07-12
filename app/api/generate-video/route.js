@@ -1,29 +1,19 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { convexAuthNextjsToken } from "@convex-dev/auth/nextjs/server";
 import { fetchMutation } from "convex/nextjs";
-import { readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import path from "node:path";
 import { NextResponse } from "next/server";
 import { api } from "../../../convex/_generated/api.js";
-import { chromaKeyToProResAlpha } from "../../../lib/chroma-key.js";
 import { generationPrompts } from "../../../lib/generation-prompts.js";
 import { storeGeneratedMedia } from "../../../lib/media-storage.js";
 import { validateImageUpload } from "../../../lib/openai-images.js";
 import { generateSoraVideo } from "../../../lib/openai-video.js";
-import { padToVideoFrame } from "../../../lib/video-frame.js";
+import { processVideo, requireContentLength } from "../../../lib/video-processor.js";
 
 export const maxDuration = 300;
 
 const VIDEO_SIZE = { width: 1280, height: 720 };
 
 export async function POST(request) {
-  const id = crypto.randomUUID();
-  const sourcePath = path.join(tmpdir(), `${id}-source.png`);
-  const framePath = path.join(tmpdir(), `${id}-frame.png`);
-  const rawPath = path.join(tmpdir(), `${id}-raw.mp4`);
-  const alphaPath = path.join(tmpdir(), `${id}-alpha.mov`);
-
   try {
     const token = await convexAuthNextjsToken();
     if (!token) {
@@ -34,10 +24,17 @@ export async function POST(request) {
     const sceneImage = form.get("image");
     validateImageUpload(sceneImage);
 
-    await writeFile(sourcePath, Buffer.from(await sceneImage.arrayBuffer()));
-    await padToVideoFrame(sourcePath, framePath, VIDEO_SIZE.width, VIDEO_SIZE.height);
+    const { env } = await getCloudflareContext({ async: true });
+    const paddedResponse = await processVideo({
+      binding: env.VIDEO_PROCESSOR,
+      operation: "pad-frame",
+      bytes: sceneImage,
+      contentType: sceneImage.type,
+      width: VIDEO_SIZE.width,
+      height: VIDEO_SIZE.height,
+    });
 
-    const paddedFrame = new Blob([await readFile(framePath)], { type: "image/png" });
+    const paddedFrame = await paddedResponse.blob();
     const rawVideo = await generateSoraVideo({
       apiKey: process.env.OPENAI_API_KEY,
       image: paddedFrame,
@@ -45,14 +42,18 @@ export async function POST(request) {
       size: `${VIDEO_SIZE.width}x${VIDEO_SIZE.height}`,
       seconds: "4",
     });
-    await writeFile(rawPath, rawVideo);
-    await chromaKeyToProResAlpha(rawPath, alphaPath);
-    const alphaVideo = await readFile(alphaPath);
+    const alphaResponse = await processVideo({
+      binding: env.VIDEO_PROCESSOR,
+      operation: "chroma-key",
+      bytes: rawVideo,
+      contentType: "video/mp4",
+    });
+    const alphaSize = await requireContentLength(alphaResponse);
 
-    const { env } = await getCloudflareContext({ async: true });
     const stored = await storeGeneratedMedia({
       bucket: env.MEDIA_BUCKET,
-      bytes: alphaVideo,
+      bytes: alphaResponse.body,
+      size: alphaSize,
       contentType: "video/quicktime",
       kind: "video",
       previewBytes: rawVideo,
@@ -70,10 +71,5 @@ export async function POST(request) {
   } catch (error) {
     const status = error.status || (/OPENAI_API_KEY/.test(error.message) ? 503 : 400);
     return NextResponse.json({ error: error.message }, { status });
-  } finally {
-    await rm(sourcePath, { force: true });
-    await rm(framePath, { force: true });
-    await rm(rawPath, { force: true });
-    await rm(alphaPath, { force: true });
   }
 }

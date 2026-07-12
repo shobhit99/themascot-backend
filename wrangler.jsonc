@@ -1,9 +1,12 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "themascot-app",
-  "main": ".open-next/worker.js",
-  "compatibility_date": "2026-07-12",
+  "main": "worker.js",
+  "compatibility_date": "2026-07-08",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "dev": {
+    "enable_containers": false
+  },
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
@@ -12,6 +15,28 @@
     {
       "binding": "MEDIA_BUCKET",
       "bucket_name": "themascot-generated-media"
+    }
+  ],
+  "containers": [
+    {
+      "class_name": "VideoProcessorContainer",
+      "image": "./container/Dockerfile",
+      "max_instances": 1,
+      "instance_type": "standard-1"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "VIDEO_PROCESSOR",
+        "class_name": "VideoProcessorContainer"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1-video-processor",
+      "new_sqlite_classes": ["VideoProcessorContainer"]
     }
   ],
   "routes": [
