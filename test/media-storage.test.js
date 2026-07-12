@@ -20,6 +20,19 @@ function fakeBucket({ failPut = false } = {}) {
   };
 }
 
+function fixedLengthStreamHarness() {
+  const fixedBodies = new WeakSet();
+  class FakeFixedLengthStream {
+    constructor() {
+      const { readable, writable } = new TransformStream();
+      this.readable = readable;
+      this.writable = writable;
+      fixedBodies.add(readable);
+    }
+  }
+  return { FakeFixedLengthStream, fixedBodies };
+}
+
 test("storeGeneratedMedia reserves user-scoped destinations, uploads, and finalizes", async () => {
   const bucket = fakeBucket();
   let reserved;
@@ -98,6 +111,7 @@ test("storeGeneratedMedia stores a private preview at the reserved destination",
 
 test("storeGeneratedMedia accepts an explicit size for streaming container output", async () => {
   const bucket = fakeBucket();
+  const { FakeFixedLengthStream } = fixedLengthStreamHarness();
   let reserved;
 
   await storeGeneratedMedia({
@@ -120,9 +134,48 @@ test("storeGeneratedMedia accepts an explicit size for streaming container outpu
     },
     finalizeMedia: async () => {},
     abortMedia: async () => {},
+    FixedLengthStreamImpl: FakeFixedLengthStream,
   });
 
   assert.equal(reserved.size, 123_456);
+});
+
+test("storeGeneratedMedia gives streaming R2 uploads a fixed length", async () => {
+  const { FakeFixedLengthStream, fixedBodies } = fixedLengthStreamHarness();
+  let stored;
+  const bucket = {
+    async put(_key, value) {
+      if (!fixedBodies.has(value)) {
+        throw new TypeError(
+          "Provided readable stream must have a known length (request/response body or readable half of FixedLengthStream)",
+        );
+      }
+      stored = Buffer.from(await new Response(value).arrayBuffer());
+    },
+    async delete() {},
+  };
+
+  await storeGeneratedMedia({
+    bucket,
+    bytes: new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode("mov"));
+        controller.close();
+      },
+    }),
+    size: 3,
+    contentType: "video/quicktime",
+    kind: "video",
+    reserveMedia: async () => ({
+      mediaId: "media-fixed-stream",
+      objectKey: "users/user-1/media/media-fixed-stream/asset.mov",
+    }),
+    finalizeMedia: async () => {},
+    abortMedia: async () => {},
+    FixedLengthStreamImpl: FakeFixedLengthStream,
+  });
+
+  assert.equal(stored.toString(), "mov");
 });
 
 test("storeGeneratedMedia cleans uploaded objects and aborts a reservation when R2 fails", async () => {
