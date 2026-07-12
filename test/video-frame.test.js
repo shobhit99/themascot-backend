@@ -5,16 +5,22 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import test from "node:test";
+import ffmpegPath from "ffmpeg-static";
 
 import { padToVideoFrame } from "../lib/video-frame.js";
 
 const execFileAsync = promisify(execFile);
+const ffmpeg = ffmpegPath || "ffmpeg";
 
 test("padToVideoFrame scales a square image into a 16:9 frame without cropping", async (t) => {
+  let ffprobeAvailable = true;
   try {
-    await execFileAsync("ffmpeg", ["-version"]);
+    await execFileAsync("ffprobe", ["-version"]);
   } catch {
-    t.skip("ffmpeg is not installed on this machine");
+    ffprobeAvailable = false;
+  }
+  if (!ffprobeAvailable) {
+    t.skip("ffprobe is not installed on this machine (only used to verify the test output)");
     return;
   }
 
@@ -23,7 +29,7 @@ test("padToVideoFrame scales a square image into a 16:9 frame without cropping",
   const outputPath = path.join(dir, "output.png");
 
   try {
-    await execFileAsync("ffmpeg", [
+    await execFileAsync(ffmpeg, [
       "-y",
       "-f",
       "lavfi",

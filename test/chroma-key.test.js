@@ -6,16 +6,22 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import test from "node:test";
+import ffmpegPath from "ffmpeg-static";
 
 import { chromaKeyToProResAlpha } from "../lib/chroma-key.js";
 
 const execFileAsync = promisify(execFile);
+const ffmpeg = ffmpegPath || "ffmpeg";
 
 test("chromaKeyToProResAlpha keys out the green screen and writes a ProRes 4444 alpha .mov", async (t) => {
+  let ffprobeAvailable = true;
   try {
-    await execFileAsync("ffmpeg", ["-version"]);
+    await execFileAsync("ffprobe", ["-version"]);
   } catch {
-    t.skip("ffmpeg is not installed on this machine");
+    ffprobeAvailable = false;
+  }
+  if (!ffprobeAvailable) {
+    t.skip("ffprobe is not installed on this machine (only used to verify the test output)");
     return;
   }
 
@@ -24,7 +30,7 @@ test("chromaKeyToProResAlpha keys out the green screen and writes a ProRes 4444 
   const outputPath = path.join(dir, "output.mov");
 
   try {
-    await execFileAsync("ffmpeg", ["-y", "-f", "lavfi", "-i", "color=c=0x009611:s=64x64:d=0.3:r=10", inputPath]);
+    await execFileAsync(ffmpeg, ["-y", "-f", "lavfi", "-i", "color=c=0x009611:s=64x64:d=0.3:r=10", inputPath]);
 
     await chromaKeyToProResAlpha(inputPath, outputPath);
 
@@ -52,14 +58,7 @@ test("chromaKeyToProResAlpha keys out the green screen and writes a ProRes 4444 
   }
 });
 
-test("chromaKeyToProResAlpha rejects when ffmpeg fails", async (t) => {
-  try {
-    await execFileAsync("ffmpeg", ["-version"]);
-  } catch {
-    t.skip("ffmpeg is not installed on this machine");
-    return;
-  }
-
+test("chromaKeyToProResAlpha rejects when ffmpeg fails", async () => {
   await assert.rejects(
     chromaKeyToProResAlpha("/nonexistent/input.mp4", "/tmp/should-not-be-created.mov"),
     /ffmpeg exited with code/,
